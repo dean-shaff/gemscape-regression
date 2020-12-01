@@ -69,7 +69,6 @@ def main():
 
     ds = preprocessing.build_dataset_from_dirs(settings.data_dir)
     spec_ds = ds.map(lambda waveform, target: (get_spectrogram(waveform), target))
-
     # batch_size = 2
     # spec_ds = spec_ds.batch(batch_size)
 
@@ -83,7 +82,7 @@ def main():
         loss=tf.keras.losses.MeanSquaredError(),
         metrics=[tf.keras.metrics.RootMeanSquaredError()]
     )
-    
+
     batch_size = 2
     spec_ds = spec_ds.batch(batch_size)
 

@@ -135,24 +135,32 @@ def get_waveform_and_label(mp3_file_path: str, **kwargs):
 
 
 
-def build_dataset_from_dirs(data_dir: str, desired_time: float = 30.0):
+def build_dataset_from_dirs(
+    data_dir: str,
+    desired_time: float = 30.0,
+    max_files: int = None,
+):
     """
+    Args:
+        max_files: max number of files to process
     """
-
-
     sample_rate = 44100
     desired_samples = int(desired_time * sample_rate)
 
     mp3_file_paths = [os.path.join(data_dir, name)
                       for name in os.listdir(data_dir)
                       if name.endswith(".mp3")]
+
+    if max_files is None:
+        max_files = len(mp3_file_paths)
+
     kwargs = dict(desired_samples=desired_samples, desired_channels=1)
 
-    # samples_labels = list(zip(*[get_waveform_and_label(file_path, **kwargs)
-    #                             for file_path in mp3_file_paths[:2]]))
     features = []
     targets = []
-    for file_path in mp3_file_paths:
+    max_files = min(max_files, len(mp3_file_paths))
+    for idx in range(max_files):
+        file_path = mp3_file_paths[idx]
         feature, target = get_waveform_and_label(file_path, **kwargs)
         features.append(feature)
         targets.append(target)
