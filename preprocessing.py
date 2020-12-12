@@ -134,7 +134,6 @@ def get_waveform_and_label(mp3_file_path: str, **kwargs):
     return load_tagged_vector(mp3_file_path, wav_file_path, **kwargs)
 
 
-
 def build_dataset_from_dirs(
     data_dir: str,
     desired_time: float = 30.0,
@@ -173,7 +172,7 @@ def build_dataset_from_dirs(
         try:
             feature, target = get_waveform_and_label(file_path, **kwargs)
         except (IndexError, ValueError, TypeError) as err:
-            print(f"Couldn't process {file_path}")
+            module_logger.error(f"build_dataset_from_dirs: couldn't process {file_path}")
         features.append(feature)
         targets.append(target)
 
@@ -181,19 +180,7 @@ def build_dataset_from_dirs(
     targets = np.array(targets)
     len_features = len(features)
     test_split_int = int(test_split * len_features)
+    module_logger.debug(f"build_dataset_from_dirs: test_split_int={test_split_int}")
     train_ds = tf.data.Dataset.from_tensor_slices((features[:test_split_int], targets[:test_split_int]))
     test_ds = tf.data.Dataset.from_tensor_slices((features[test_split_int:], targets[test_split_int:]))
-
     return train_ds, test_ds
-
-    # ds = tf.data.Dataset.from_generator(
-    #     generator,
-    #     (tf.float32, tf.float32)
-    # )
-    # features = np.concatenate(features)
-    # targets = np.concatenate(targets)
-    # print(features.shape, targets.shape)
-    # print(ds)
-    # features_ds = tf.data.Dataset.from_tensor_slices(samples_labels[0])
-    # targets_ds = tf.data.Dataset.from_tensor_slices(samples_labels[1])
-    # return features_ds, targets_ds

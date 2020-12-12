@@ -79,7 +79,9 @@ def main():
 
     desired_time = 1.0
     samples_per_slice = 32
-    max_files = 200
+    max_files = 10
+    epochs = 10
+
     checkpoints_dir = os.path.join(settings.checkpoints_dir, f"t-{desired_time}_sps-{samples_per_slice}")
     checkpoints_path = os.path.join(checkpoints_dir, "cp-{epoch:04d}.ckpt")
 
@@ -89,25 +91,38 @@ def main():
         desired_time=desired_time,
         max_files=max_files
     )
-    rnn_ds = ds.map(lambda waveform, target: (reshape_waveform(waveform, samples_per_slice=samples_per_slice), target))
 
-    model = make_model(rnn_ds)
+    def mapper(waveform, target):
+        return (reshape_waveform(waveform, samples_per_slice=samples_per_slice), target)
 
+    train_ds = train_ds.map(mapper)
+    test_ds = test_ds.map(mapper)
+
+    for (spec, target) in test_ds.take(1):
+        print(spec.shape)
+
+
+    loss = tf.keras.losses.MeanSquaredError()
+
+    model = make_model(train_ds)
     model.compile(
         # optimizer=tf.keras.optimizers.Adam(learning_rate=0.001),
         optimizer=tf.keras.optimizers.SGD(learning_rate=0.01, momentum=0.0001),
         # metrics=[tf.keras.metrics.RootMeanSquaredError()],
-        loss=tf.keras.losses.MeanSquaredError()
+        loss=loss
     )
 
-    batch_size = 5
-    rnn_ds_batched = rnn_ds.batch(batch_size)
+    batch_size = 2
+    train_ds_batched = train_ds.batch(batch_size)
 
-    for (spec, target) in rnn_ds.take(1):
+    for (spec, target) in test_ds.take(1):
         spec = spec[np.newaxis, :]
         pred = model.predict(spec)
-        print(f"target={target}")
-        print(f"pred={pred}")
+        print("before training:")
+        with np.printoptions(precision=3):
+            print(f"    target={target}")
+            print(f"    pred={pred[0]}")
+            print(f"    loss={loss(target, pred[0]).numpy():.3f}")
 
     cp_callback = tf.keras.callbacks.ModelCheckpoint(
         filepath=checkpoints_path,
@@ -116,16 +131,21 @@ def main():
         save_freq=max_files)
 
     history = model.fit(
-        rnn_ds_batched,
-        epochs=100,
-        callbacks=[cp_callback]
+        train_ds_batched,
+        epochs=epochs,
+        callbacks=[cp_callback],
+        validation_data=test_ds.batch(1)
     )
 
-    for (spec, target) in rnn_ds.take(1):
+    for (spec, target) in test_ds.take(1):
         spec = spec[np.newaxis, :]
         pred = model.predict(spec)
-        print(f"target={target}")
-        print(f"pred={pred}")
+        print("after training")
+        with np.printoptions(precision=3):
+            print(f"    target={target}")
+            print(f"    pred={pred[0]}")
+            print(f"    loss={loss(target, pred[0]).numpy():.3f}")
+
 
 
 
