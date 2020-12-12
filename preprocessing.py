@@ -5,13 +5,13 @@ import shlex
 import subprocess
 import os
 
+import tqdm
 import eyed3
 import tensorflow as tf
 import pysndfile
 import numpy as np
 
 ArrayType = np.array
-AUTOTUNE = tf.data.experimental.AUTOTUNE
 
 module_logger = logging.getLogger(__name__)
 
@@ -139,11 +139,15 @@ def build_dataset_from_dirs(
     data_dir: str,
     desired_time: float = 30.0,
     max_files: int = None,
+    test_split: float = 0.8
 ):
     """
     Args:
         max_files: max number of files to process
     """
+    if test_split > 1.0 or test_split < 0.0:
+        raise ValueError("test_split needs to be between 0.0 and 1.0")
+
     sample_rate = 44100
     desired_samples = int(desired_time * sample_rate)
 
@@ -159,16 +163,28 @@ def build_dataset_from_dirs(
     features = []
     targets = []
     max_files = min(max_files, len(mp3_file_paths))
-    for idx in range(max_files):
+
+    iterator = range(max_files)
+    if module_logger.getEffectiveLevel() > logging.DEBUG:
+        iterator = tqdm.tqdm(range(max_files))
+
+    for idx in iterator:
         file_path = mp3_file_paths[idx]
-        feature, target = get_waveform_and_label(file_path, **kwargs)
+        try:
+            feature, target = get_waveform_and_label(file_path, **kwargs)
+        except (IndexError, ValueError, TypeError) as err:
+            print(f"Couldn't process {file_path}")
         features.append(feature)
         targets.append(target)
 
     features = np.array(features)
     targets = np.array(targets)
-    ds = tf.data.Dataset.from_tensor_slices((features, targets))
-    return ds
+    len_features = len(features)
+    test_split_int = int(test_split * len_features)
+    train_ds = tf.data.Dataset.from_tensor_slices((features[:test_split_int], targets[:test_split_int]))
+    test_ds = tf.data.Dataset.from_tensor_slices((features[test_split_int:], targets[test_split_int:]))
+
+    return train_ds, test_ds
 
     # ds = tf.data.Dataset.from_generator(
     #     generator,
